@@ -1,151 +1,13 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <title>주문 예측 시스템</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background-color: #f2f2f2;
-      margin: 0;
-      padding: 20px;
-    }
+<script>
+  function startBusiness() {
+    document.getElementById("mode-selection").style.display = "none";
+    document.getElementById("order-container").style.display = "block";
+  }
 
-    h1 {
-      text-align: center;
-      color: #333;
-    }
-
-    .container {
-      max-width: 800px;
-      margin: auto;
-      background-color: white;
-      border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-      padding: 20px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-    }
-
-    th, td {
-      padding: 10px;
-      text-align: center;
-      border-bottom: 1px solid #ccc;
-      white-space: nowrap;
-    }
-
-    th {
-      background-color: #f0f0f0;
-    }
-
-    td {
-      font-size: 15px;
-    }
-
-    button {
-      padding: 6px 14px;
-      margin: 3px;
-      border: none;
-      border-radius: 5px;
-      color: white;
-      cursor: pointer;
-    }
-
-    /* ✅ 중요 버튼 스타일 */
-    .big-button {
-      font-size: 18px;
-      padding: 14px 28px;
-      font-weight: bold;
-      border-radius: 8px;
-    }
-
-    .start-button {
-      background-color: #2ecc71;
-    }
-
-    .start-button:hover {
-      background-color: #27ae60;
-    }
-
-    .end-button {
-      background-color: #e74c3c;
-    }
-
-    .end-button:hover {
-      background-color: #c0392b;
-    }
-
-    .default-button {
-      background-color: #3498db;
-    }
-
-    .default-button:hover {
-      background-color: #2980b9;
-    }
-
-    #mode-selection {
-      text-align: center;
-      margin-top: 100px;
-    }
-
-    #summary-section {
-      text-align: center;
-      margin-top: 60px;
-    }
-  </style>
-</head>
-<body>
-
-  <!-- 영업 시작 화면 -->
-  <div id="mode-selection" class="container">
-    <h1>영업을 시작하시겠습니까?</h1>
-    <button class="big-button start-button" onclick="startBusiness()">영업 시작</button>
-  </div>
-
-  <!-- 주문 목록 화면 -->
-  <div id="order-container" class="container" style="display: none;">
-    <h1>주문 목록</h1>
-
-    <!--  영업 종료 버튼 (상단에 강조된 스타일) -->
-    <div style="text-align: center; margin-bottom: 10px;">
-      <button class="big-button end-button" onclick="endBusiness()">영업 종료</button>
-    </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th>주문 번호</th>
-          <th>메뉴</th>
-          <th>주문 시각</th>
-          <th>예상 완료</th>
-          <th>지연</th>
-          <th>제조 완료</th>
-        </tr>
-      </thead>
-      <tbody id="order-table"></tbody>
-    </table>
-  </div>
-
-  <!-- 영업 종료 후 분석 요약 보기 -->
-  <div id="summary-section" class="container" style="display: none;">
-    <h2>영업 종료됨</h2>
-    <button class="big-button default-button" onclick="showSummary()">모니터링 분석 요약 보기</button>
-  </div>
-
-  <script>
-    function startBusiness() {
-      document.getElementById("mode-selection").style.display = "none";
-      document.getElementById("order-container").style.display = "block";
-    }
-
-    function endBusiness() {
-      document.getElementById("order-container").style.display = "none";
-      document.getElementById("summary-section").style.display = "block";
-    }
+  function endBusiness() {
+    document.getElementById("order-container").style.display = "none";
+    document.getElementById("summary-section").style.display = "block";
+  }
 
   function showSummary() {
     fetch('/summary')
@@ -153,35 +15,36 @@
       .then(data => {
         if (data.status === "ok") {
           alert(
-            `📊 예측 정확도: ${data.average_accuracy_percent}%\n` +
-            `⏱ 평균 지연 시간: ${data.average_delay_seconds}초`
+            `예측 정확도: ${data.average_accuracy_percent}%\n` +
+            `평균 지연 시간: ${data.average_delay_seconds}초`
           );
         } else {
-          alert(data.message);
+          alert(data.message || "요약 정보를 불러올 수 없습니다.");
         }
-      });
-}
+      })
+      .catch(() => alert("서버 오류로 요약 불러오기 실패"));
+  }
 
+  function compressMenus(menus) {
+    const counts = {};
+    menus.forEach(menu => {
+      counts[menu] = (counts[menu] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([menu, count]) => count > 1 ? `${menu} x${count}` : menu)
+      .join(", ");
+  }
 
-    function compressMenus(menus) {
-      const counts = {};
-      menus.forEach(menu => {
-        counts[menu] = (counts[menu] || 0) + 1;
-      });
-      return Object.entries(counts)
-        .map(([menu, count]) => count > 1 ? `${menu} x${count}` : menu)
-        .join(", ");
+  function formatTime(isoString) {
+    try {
+      return new Date(isoString).toTimeString().split(" ")[0];
+    } catch {
+      return isoString;
     }
+  }
 
-    function formatTime(isoString) {
-      try {
-        return new Date(isoString).toTimeString().split(" ")[0];
-      } catch {
-        return isoString;
-      }
-    }
-
-    async function fetchOrders() {
+  async function fetchOrders() {
+    try {
       const res = await fetch('/orders');
       const data = await res.json();
       const tbody = document.getElementById('order-table');
@@ -202,37 +65,45 @@
         `;
         tbody.appendChild(row);
       });
+    } catch (e) {
+      alert("주문 불러오기 실패");
     }
+  }
 
-    function addDelay(orderId) {
-      fetch(`/delay?order_id=${orderId}&minutes=3`, { method: "POST" })
-        .then(res => res.json())
-        .then(data => {
-          if (data.status === "ok") {
-            document.getElementById(`predicted-${orderId}`).innerText = data.new_predicted;
-          } else {
-            alert("지연 실패: " + data.message);
-          }
-        });
+  function addDelay(orderId) {
+    fetch(`/delay?order_id=${orderId}&minutes=3`, { method: "POST" })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === "ok") {
+          document.getElementById(`predicted-${orderId}`).innerText = data.new_predicted;
+        } else {
+          alert("지연 실패: " + (data.message || "서버 응답 없음"));
+        }
+      })
+      .catch(() => {
+        alert("지연 실패: 네트워크 오류");
+      });
+  }
+
+  function markComplete(orderId) {
+    fetch(`/complete?order_id=${orderId}`, { method: "POST" })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === "ok") {
+          alert(`주문 ${orderId} 완료 처리됨: ${data.completed}`);
+        } else {
+          alert("완료 실패: " + (data.message || "서버 응답 없음"));
+        }
+      })
+      .catch(() => {
+        alert("완료 실패: 네트워크 오류");
+      });
+  }
+
+  // 자동 갱신
+  setInterval(() => {
+    if (document.getElementById("order-container").style.display !== "none") {
+      fetchOrders();
     }
-
-    function markComplete(orderId) {
-      fetch(`/complete?order_id=${orderId}`, { method: "POST" })
-        .then(res => res.json())
-        .then(data => {
-          if (data.status === "ok") {
-            alert(`주문 ${orderId} 완료 처리됨: ${data.completed}`);
-          } else {
-            alert("실패: " + data.message);
-          }
-        });
-    }
-
-    setInterval(() => {
-      if (document.getElementById("order-container").style.display !== "none") {
-        fetchOrders();
-      }
-    }, 3000);
-  </script>
-</body>
-</html>
+  }, 3000);
+</script>
