@@ -91,7 +91,9 @@ def complete_order(order_id: int = Query(...)):
         if order["order_id"] == order_id:
             order["actual"] = now_str
 
-            predicted_time = datetime.strptime(order["predicted"], "%Y-%m-%d %H:%M:%S")
+            predicted_time = timezone('Asia/Seoul').localize(
+                 datetime.strptime(order["predicted"], "%Y-%m-%d %H:%M:%S")
+            )
             diff = (now - predicted_time).total_seconds()
 
             completed_orders.append({
