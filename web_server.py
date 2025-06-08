@@ -2,6 +2,7 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from datetime import datetime, timedelta
+from pytz import timezone  # 한국 시간 적용용
 import random, os
 
 app = FastAPI()
@@ -37,13 +38,11 @@ order_id_counter = 1
 @app.get("/orders")
 def get_orders():
     global order_id_counter
-
+    now = datetime.now(timezone('Asia/Seoul'))  #  한국 시간
     if random.random() < 0.3:
         menu_count = random.randint(1, 3)
         menus = random.choices(list(MENU_TIME.keys()), k=menu_count)
         duration_total = sum([MENU_TIME[m] for m in menus])
-
-        now = datetime.now()
         predicted = now + timedelta(seconds=duration_total)
 
         order = {
@@ -72,7 +71,7 @@ def delay_order(order_id: int = Query(...), minutes: int = Query(...)):
 # 완료 처리
 @app.post("/complete")
 def complete_order(order_id: int = Query(...)):
-    now = datetime.now()
+    now = datetime.now(timezone('Asia/Seoul'))  # 한국 시간
     now_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
     for order in orders:
@@ -82,14 +81,16 @@ def complete_order(order_id: int = Query(...)):
             predicted_time = datetime.strptime(order["predicted"], "%Y-%m-%d %H:%M:%S")
             diff = (now - predicted_time).total_seconds()
 
+            # 무조건 completed_orders에 저장
+            completed_orders.append({
+                "order_id": order_id,
+                "menus": order["menus"],
+                "predicted": order["predicted"],
+                "actual": now_str,
+                "delay_seconds": diff if diff > 0 else 0  # 빠른 건 0초로 기록
+            })
+
             if diff >= 0:
-                completed_orders.append({
-                    "order_id": order_id,
-                    "menus": order["menus"],
-                    "predicted": order["predicted"],
-                    "actual": now_str,
-                    "delay_seconds": diff
-                })
                 print(f"[제조 완료] 주문 {order_id} 늦음 → {now_str} (지연 {diff:.1f}초)")
             else:
                 print(f"[제조 완료] 주문 {order_id} 빠름 → {now_str} (예상보다 {-diff:.1f}초 빠름)")
@@ -107,15 +108,26 @@ def summary():
     max_tolerated = 180
     total_accuracy = 0
     total_delay = 0
+    counted = 0
 
     for record in completed_orders:
         delay = record["delay_seconds"]
-        accuracy = max(0, 1 - delay / max_tolerated)
-        total_accuracy += accuracy
-        total_delay += delay
 
-    average_accuracy = (total_accuracy / len(completed_orders)) * 100
-    average_delay = total_delay / len(completed_orders)
+        if delay > 0:
+            accuracy = max(0, 1 - delay / max_tolerated)
+            total_accuracy += accuracy
+            total_delay += delay
+            counted += 1
+
+    if counted == 0:
+        return {
+            "status": "ok",
+            "average_accuracy_percent": 100.0,
+            "average_delay_seconds": 0.0
+        }
+
+    average_accuracy = (total_accuracy / counted) * 100
+    average_delay = total_delay / counted
 
     return {
         "status": "ok",
