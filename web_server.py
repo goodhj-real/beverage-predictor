@@ -39,7 +39,7 @@ order_id_counter = 1
 def get_orders():
     global order_id_counter
     now = datetime.now(timezone('Asia/Seoul'))  #  한국 시간
-    if random.random() < 0.3:
+    if random.random() < 0.8:
         menu_count = random.randint(1, 3)
         menus = random.choices(list(MENU_TIME.keys()), k=menu_count)
         duration_total = sum([MENU_TIME[m] for m in menus])
