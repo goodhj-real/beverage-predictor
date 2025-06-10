@@ -160,3 +160,8 @@ def summary():
         "average_delay_seconds": round(average_delay, 1),
         "orders": summary_list
     }
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("web_server:app", host="0.0.0.0", port=port)
