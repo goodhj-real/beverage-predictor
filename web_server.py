@@ -48,8 +48,8 @@ def get_orders():
         order = {
             "order_id": order_id_counter,
             "menus": menus,
-            "time": now.strftime("%Y-%m-%d %H:%M:%S"),
-            "predicted": predicted.strftime("%Y-%m-%d %H:%M:%S")
+            "time": now.isoformat(),
+            "predicted": predicted.isoformat()
         }
         orders.append(order)
         print(f"[주문 생성] {order}")

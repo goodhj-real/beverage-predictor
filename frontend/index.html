@@ -134,7 +134,7 @@
 
       function formatTime(isoString) {
         try {
-          return new Date(isoString).toTimeString().split(" ")[0];
+          return isoString.split("T")[1].split(".")[0];
         } catch {
           return isoString;
         }
