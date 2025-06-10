@@ -31,7 +31,7 @@ MENU_TIME = {
 orders = []
 completed_orders = []
 order_id_counter = 1
-last_order_time = datetime.now(timezone('Asia/Seoul'))
+last_order_time = datetime.now(timezone('Asia/Seoul')) - timedelta(seconds=5)
 is_operating = False
 
 @app.post("/start")
