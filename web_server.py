@@ -32,11 +32,21 @@ orders = []
 completed_orders = []
 order_id_counter = 1
 last_order_time = datetime.now(timezone('Asia/Seoul'))
+is_operating = False
+
+@app.post("/start")
+def start_operation():
+    global is_operating
+    is_operating = True
+    return {"status": "ok"}
 
 # 주문 생성
 @app.get("/orders")
 def get_orders():
     global order_id_counter, last_order_time
+
+    if not is_operating:
+        return orders
 
     now = datetime.now(timezone('Asia/Seoul'))
     if (now - last_order_time).total_seconds() >= 5:
@@ -58,7 +68,7 @@ def get_orders():
 
     return orders
 
-# 지연 추가 (해당 주문 이후 전부 밀림)
+# 지연 추가
 @app.post("/delay")
 def delay_order(order_id: int = Query(...), minutes: int = Query(...)):
     target_index = None
@@ -66,7 +76,7 @@ def delay_order(order_id: int = Query(...), minutes: int = Query(...)):
     for idx, order in enumerate(orders):
         if order["order_id"] == order_id:
             target_index = idx
-            predicted_dt = datetime.strptime(order["predicted"], "%Y-%m-%d %H:%M:%S")
+            predicted_dt = datetime.strptime(order["predicted"], "%Y-%m-%dT%H:%M:%S.%f%z")
             new_time = predicted_dt + timedelta(minutes=minutes)
             order["predicted"] = new_time.strftime("%Y-%m-%d %H:%M:%S")
             break
