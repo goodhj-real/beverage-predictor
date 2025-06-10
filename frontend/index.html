@@ -5,21 +5,19 @@
   <title>주문 예측 시스템</title>
   <style>
     body {
-      font-family: sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
       background-color: #f2f2f2;
       margin: 0;
-      padding: 20px;
+      padding:  20px;
     }
-    h1 {
-      text-align: center;
-      color: #333;
-    }
+    h1 { text-align: center; color: #333; }
+    h2 { text-align: center; color: #555; }
     .container {
       max-width: 800px;
       margin: auto;
       background-color: white;
       border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       padding: 20px;
     }
     table {
@@ -28,17 +26,13 @@
       margin-top: 10px;
     }
     th, td {
-      padding: 10px;
+      padding: 12px 10px;
       text-align: center;
-      border-bottom: 1px solid #ccc;
+      border-bottom: 1px solid #eee;
       white-space: nowrap;
     }
-    th {
-      background-color: #f0f0f0;
-    }
-    td {
-      font-size: 15px;
-    }
+    th { background-color: #f8f9fa; }
+    td { font-size: 15px; }
     button {
       padding: 6px 14px;
       margin: 3px;
@@ -46,6 +40,7 @@
       border-radius: 5px;
       color: white;
       cursor: pointer;
+      transition: background-color 0.2s;
     }
     .big-button {
       font-size: 18px;
@@ -61,6 +56,64 @@
     .default-button:hover { background-color: #2980b9; }
     #mode-selection { text-align: center; margin-top: 100px; }
     #summary-section { text-align: center; margin-top: 60px; }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background-color: white;
+      padding: 30px 40px;
+      border-radius: 15px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.25);
+      width: 90%;
+      max-width: 450px;
+      text-align: center;
+      animation: slideUp 0.3s ease-out;
+    }
+    .modal-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+      margin-top: 0;
+      margin-bottom: 25px;
+    }
+    .summary-metric {
+      margin: 20px 0;
+    }
+    .metric-label {
+      font-size: 16px;
+      color: #666;
+      margin-bottom: 8px;
+    }
+    .metric-value {
+      font-size: 36px;
+      font-weight: bold;
+    }
+    .value-accuracy { color: #3498db; }
+    .value-early { color: #2ecc71; }
+    .value-late { color: #e74c3c; }
+    .modal-confirm-btn {
+      background-color: #3498db;
+      font-size: 18px;
+      padding: 12px 24px;
+      margin-top: 20px;
+      width: 100%;
+    }
+    .modal-confirm-btn:hover { background-color: #2980b9; }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
   </style>
 </head>
 <body>
@@ -94,109 +147,131 @@
     <button class="big-button default-button" id="summary-btn">모니터링 분석 요약 보기</button>
   </div>
 
+  <div id="summary-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h2 class="modal-title">영업 분석 요약</h2>
+      <div class="summary-metric">
+        <div class="metric-label">예측 정확도</div>
+        <div id="modal-accuracy" class="metric-value value-accuracy">0%</div>
+      </div>
+      <div class="summary-metric">
+        <div class="metric-label">평균 완료 시간</div>
+        <div id="modal-delay" class="metric-value">정시</div>
+      </div>
+      <button id="modal-close-btn" class="big-button modal-confirm-btn">확인</button>
+    </div>
+  </div>
+
   <script>
     document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById("start-btn").addEventListener("click", () => {
-        document.getElementById("mode-selection").style.display = "none";
-        document.getElementById("order-container").style.display = "block";
-      });
+      const startBtn = document.getElementById("start-btn");
+      const endBtn = document.getElementById("end-btn");
+      const summaryBtn = document.getElementById("summary-btn");
+      const modal = document.getElementById("summary-modal");
+      const modalClose = document.getElementById("modal-close-btn");
+      const modeSection = document.getElementById("mode-selection");
+      const orderSection = document.getElementById("order-container");
+      const summarySection = document.getElementById("summary-section");
+      const modalAccuracy = document.getElementById("modal-accuracy");
+      const modalDelay = document.getElementById("modal-delay");
 
-      document.getElementById("end-btn").addEventListener("click", () => {
-        document.getElementById("order-container").style.display = "none";
-        document.getElementById("summary-section").style.display = "block";
-      });
+      function formatTime(seconds) {
+        const abs = Math.abs(seconds);
+        const mins = Math.floor(abs / 60);
+        const secs = Math.round(abs % 60);
+        if (mins === 0) return `${secs}초`;
+        if (secs === 0) return `${mins}분`;
+        return `${mins}분 ${secs}초`;
+      }
 
-      document.getElementById("summary-btn").addEventListener("click", () => {
-        fetch('/summary')
+      startBtn.addEventListener("click", () => {
+        fetch("/start", { method: "POST" })
           .then(res => res.json())
           .then(data => {
             if (data.status === "ok") {
-              alert(
-                `예측 정확도: ${data.average_accuracy_percent}%\n` +
-                `평균 지연 시간: ${data.average_delay_seconds}초`
-              );
-            } else {
-              alert(data.message || "요약 정보를 불러올 수 없습니다.");
+              modeSection.style.display = "none";
+              orderSection.style.display = "block";
             }
-          })
-          .catch(() => alert("서버 오류로 요약 불러오기 실패"));
+          });
       });
 
-      function compressMenus(menus) {
-        const counts = {};
-        menus.forEach(menu => {
-          counts[menu] = (counts[menu] || 0) + 1;
-        });
-        return Object.entries(counts)
-          .map(([menu, count]) => count > 1 ? `${menu} x${count}` : menu)
-          .join(", ");
-      }
+      endBtn.addEventListener("click", () => {
+        orderSection.style.display = "none";
+        summarySection.style.display = "block";
+      });
 
-      function formatTime(isoString) {
-        try {
-          return isoString.split("T")[1].split(".")[0];
-        } catch {
-          return isoString;
-        }
-      }
-
-      async function fetchOrders() {
-        try {
-          const res = await fetch('/orders');
-          const data = await res.json();
-          const tbody = document.getElementById('order-table');
-          tbody.innerHTML = "";
-          data.forEach(order => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${order.order_id}</td>
-              <td>${compressMenus(order.menus)}</td>
-              <td>${formatTime(order.time)}</td>
-              <td id="predicted-${order.order_id}">${order.predicted}</td>
-              <td>
-                <button class="default-button" onclick="addDelay(${order.order_id})">+3분</button>
-              </td>
-              <td>
-                <button class="default-button" onclick="markComplete(${order.order_id})">완료</button>
-              </td>
-            `;
-            tbody.appendChild(row);
+      summaryBtn.addEventListener("click", () => {
+        fetch("/summary")
+          .then(res => res.json())
+          .then(data => {
+            if (data.status === "ok") {
+              const seconds = data.average_delay_seconds;
+              let timeStr = "정시";
+              let cls = "value-accuracy";
+              if (seconds > 0) {
+                timeStr = `평균 ${formatTime(seconds)} 지연`;
+                cls = "value-late";
+              } else if (seconds < 0) {
+                timeStr = `평균 ${formatTime(seconds)} 빠름`;
+                cls = "value-early";
+              }
+              modalAccuracy.textContent = `${data.average_accuracy_percent}%`;
+              modalDelay.textContent = timeStr;
+              modalDelay.className = `metric-value ${cls}`;
+              modal.style.display = "flex";
+            }
           });
-        } catch (e) {
-          alert("주문 불러오기 실패");
-        }
+      });
+
+      modalClose.addEventListener("click", () => {
+        modal.style.display = "none";
+      });
+
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) modal.style.display = "none";
+      });
+
+      function fetchOrders() {
+        fetch("/orders")
+          .then(res => res.json())
+          .then(data => {
+            const tbody = document.getElementById("order-table");
+            tbody.innerHTML = "";
+            data.forEach(order => {
+              const tr = document.createElement("tr");
+              const timeStr = new Date(order.time).toLocaleTimeString();
+              const predStr = new Date(order.predicted).toLocaleTimeString();
+              tr.innerHTML = `
+                <td>${order.order_id}</td>
+                <td>${order.menus.join(", ")}</td>
+                <td>${timeStr}</td>
+                <td>${predStr}</td>
+                <td><button class="default-button" onclick="addDelay(${order.order_id})">+3분</button></td>
+                <td><button class="default-button" onclick="markComplete(${order.order_id})">완료</button></td>
+              `;
+              tbody.appendChild(tr);
+            });
+          });
       }
 
       window.addDelay = function(orderId) {
         fetch(`/delay?order_id=${orderId}&minutes=3`, { method: "POST" })
           .then(res => res.json())
           .then(data => {
-            if (data.status === "ok") {
-              document.getElementById(`predicted-${orderId}`).innerText = data.new_predicted;
-            } else {
-              alert("지연 실패: " + (data.message || "서버 응답 없음"));
-            }
-          })
-          .catch(() => alert("지연 실패: 네트워크 오류"));
+            if (data.status === "ok") fetchOrders();
+          });
       }
 
       window.markComplete = function(orderId) {
         fetch(`/complete?order_id=${orderId}`, { method: "POST" })
           .then(res => res.json())
           .then(data => {
-            if (data.status === "ok") {
-              alert(`주문 ${orderId} 완료 처리됨: ${data.completed}`);
-            } else {
-              alert("완료 실패: " + (data.message || "서버 응답 없음"));
-            }
-          })
-          .catch(() => alert("완료 실패: 네트워크 오류"));
+            if (data.status === "ok") fetchOrders();
+          });
       }
 
       setInterval(() => {
-        if (document.getElementById("order-container").style.display !== "none") {
-          fetchOrders();
-        }
+        if (orderSection.style.display !== "none") fetchOrders();
       }, 3000);
     });
   </script>

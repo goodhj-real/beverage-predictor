@@ -1,3 +1,4 @@
+from dateutil.parser import isoparse
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -41,6 +42,7 @@ def start_operation():
     return {"status": "ok"}
 
 # 주문 생성
+# 주문 생성 - 수정된 버전
 @app.get("/orders")
 def get_orders():
     global order_id_counter, last_order_time
@@ -50,15 +52,29 @@ def get_orders():
 
     now = datetime.now(timezone('Asia/Seoul'))
     if (now - last_order_time).total_seconds() >= 5:
+        # --- 로직 변경 시작 ---
+
+        # 새 주문의 시작 시간을 결정합니다.
+        # 대기 중인 주문이 없다면 '현재 시간', 있다면 '마지막 주문의 예상 완료 시간'을 기준으로 합니다.
+        if orders:
+            last_order_predicted_time = isoparse(orders[-1]["predicted"])
+            # 만약 마지막 주문이 이미 끝났어야 할 시간이라면, 현재 시간을 시작점으로 합니다.
+            start_time = max(now, last_order_predicted_time)
+        else:
+            start_time = now
+
         menu_count = random.randint(1, 3)
         menus = random.choices(list(MENU_TIME.keys()), k=menu_count)
         duration_total = sum([MENU_TIME[m] for m in menus])
-        predicted = now + timedelta(seconds=duration_total)
+        
+        # 새로운 예상 완료 시간은 '결정된 시작 시간' + '음료 제조 시간'이 됩니다.
+        predicted = start_time + timedelta(seconds=duration_total)
+        
 
         order = {
             "order_id": order_id_counter,
             "menus": menus,
-            "time": now.isoformat(),
+            "time": now.isoformat(), 
             "predicted": predicted.isoformat()
         }
         orders.append(order)
@@ -76,18 +92,18 @@ def delay_order(order_id: int = Query(...), minutes: int = Query(...)):
     for idx, order in enumerate(orders):
         if order["order_id"] == order_id:
             target_index = idx
-            predicted_dt = datetime.strptime(order["predicted"], "%Y-%m-%dT%H:%M:%S.%f%z")
+            predicted_dt = isoparse(order["predicted"])
             new_time = predicted_dt + timedelta(minutes=minutes)
-            order["predicted"] = new_time.strftime("%Y-%m-%d %H:%M:%S")
+            order["predicted"] = new_time.isoformat()
             break
 
     if target_index is None:
         return {"status": "error", "message": "Order not found"}
 
     for i in range(target_index + 1, len(orders)):
-        pred = datetime.strptime(orders[i]["predicted"], "%Y-%m-%d %H:%M:%S")
+        pred = isoparse(orders[i]["predicted"])
         new_pred = pred + timedelta(minutes=minutes)
-        orders[i]["predicted"] = new_pred.strftime("%Y-%m-%d %H:%M:%S")
+        orders[i]["predicted"] = new_pred.isoformat()
 
     return {"status": "ok", "new_predicted": orders[target_index]["predicted"]}
 
@@ -101,9 +117,7 @@ def complete_order(order_id: int = Query(...)):
         if order["order_id"] == order_id:
             order["actual"] = now_str
 
-            predicted_time = timezone('Asia/Seoul').localize(
-                 datetime.strptime(order["predicted"], "%Y-%m-%d %H:%M:%S")
-            )
+            predicted_time = isoparse(order["predicted"])
             diff = (now - predicted_time).total_seconds()
 
             completed_orders.append({
